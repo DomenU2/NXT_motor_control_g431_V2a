@@ -60,9 +60,9 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
     ms1->posLimMin = -PI;
     ms1->posLimMax = PI;
     ms1->error_max = ms1->posLimMax - ms1->posLimMin;
-    ms1->Kpp=6000; //8000
+    ms1->Kpp=1000; //6000
     ms1->Tip=0;
-    ms1->Tdp=500; //500
+    ms1->Tdp=0; //500
 	///PWM variables
     ms1->PWM_period = p_pwmT1->Init.Period;
 
@@ -73,9 +73,9 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
 	ms2->posLimMin = -3*PI;
 	ms2->posLimMax = 3*PI;
 	ms2->error_max = ms2->posLimMax - ms2->posLimMin;
-	ms2->Kpp=6000;
+	ms2->Kpp=1000;
 	ms2->Tip=0;
-	ms2->Tdp=500;
+	ms2->Tdp=0;
 	///PWM variables
 	ms2->PWM_period = p_pwmT2->Init.Period;
 }

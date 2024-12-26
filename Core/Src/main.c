@@ -57,9 +57,10 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 
 
+uint32_t time_cnt=0;
 
-int16_t motorSpeed=0;
-int16_t motorSpeedDelta=0;
+float pos_ref_dbg[3] ={0, 1.57, 3.14};
+uint8_t pos_idx=0;
 
 /* USER CODE END PV */
 
@@ -133,7 +134,7 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim6);
 
 
-  motorSpeedDelta = htim1.Instance->ARR / 100;
+
 
   /* USER CODE END 2 */
 
@@ -717,11 +718,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
 
 	if(htim == &htim6){
+
+
+		if(time_cnt%500==0){
+			time_cnt=0;
+
+			   motor_state1.position_ref =pos_ref_dbg[pos_idx];
+			   motor_state2.position_ref =pos_ref_dbg[pos_idx];
+			   pos_idx++;
+			   pos_idx%=3;
+		   }
+		time_cnt++;
+
+		MotorControl(&motor_state1);
+		MotorControl(&motor_state2);
+
+#if 0
 	  /* open loop ramp speed control */
 	  speed_ramp_test(&motor_state1);
 	  speed_ramp_test(&motor_state2);
 	  UpdateEncoder(&motor_state1);
 	  UpdateEncoder(&motor_state2);
+#endif
 	}
 }
 
