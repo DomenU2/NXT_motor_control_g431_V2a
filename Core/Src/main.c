@@ -60,7 +60,11 @@ UART_HandleTypeDef huart2;
 uint32_t time_cnt=0;
 
 float pos_ref_dbg[3] ={0, 1.57, 3.14};
+float pos_ref_dbg1 = 0;
 uint8_t pos_idx=0;
+
+int16_t motor1_speed_dbg=0;
+int16_t motor2_speed_dbg=0;
 
 /* USER CODE END PV */
 
@@ -719,7 +723,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 
 	if(htim == &htim6){
 
-
+#if 0
 		if(time_cnt%500==0){
 			time_cnt=0;
 
@@ -729,12 +733,33 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 			   pos_idx%=3;
 		   }
 		time_cnt++;
+#endif
+
+#if 1
+time_cnt++;
+		if(time_cnt >= 1000){
+			motorEnable=1;
+			motorDriverEnable=1;
+
+			if(time_cnt % 1 == 0){
+						RefTraj1(&motor_state1);
+						RefTraj1(&motor_state2);
+					}
+		}
+
 
 		MotorControl(&motor_state1);
 		MotorControl(&motor_state2);
+		  /* open loop ramp speed control */
+#endif
 
 #if 0
-	  /* open loop ramp speed control */
+		PWM_Control_Motor(&motor_state1, motor1_speed_dbg);
+		UpdateEncoder(&motor_state1);
+		PWM_Control_Motor(&motor_state2, motor2_speed_dbg);
+		UpdateEncoder(&motor_state2);
+#endif
+#if 0
 	  speed_ramp_test(&motor_state1);
 	  speed_ramp_test(&motor_state2);
 	  UpdateEncoder(&motor_state1);

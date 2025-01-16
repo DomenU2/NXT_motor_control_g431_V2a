@@ -12,8 +12,6 @@
 
 uint8_t motorEnable = 0;
 uint8_t motorDriverEnable = 0;
-uint8_t IN1_H = 0; //test drv8833
-uint8_t IN2_H = 0; //test drv8833
 
 Motor_state_t motor_state1={0};
 Motor_state_t motor_state2={0};
@@ -54,7 +52,9 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
 
     //definicija vrednosti konstant
 	//PID variables
-    ms1->motorID = 0;
+    ms1->motorID = MOTOR_ID_1;
+    ms1->pos_sign=-1;
+    ms1->pwm_sign=1;
     ms1->p_encoderTimer = p_encT1;
     ms1->p_pwmTimer = p_pwmT1;
     ms1->posLimMin = -PI;
@@ -62,12 +62,15 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
     ms1->error_max = ms1->posLimMax - ms1->posLimMin;
     ms1->Kpp=1000; //6000
     ms1->Tip=0;
-    ms1->Tdp=0; //500
+    ms1->Tdp=100; //500
+
 	///PWM variables
     ms1->PWM_period = p_pwmT1->Init.Period;
 
 
-    ms2->motorID = 1;
+    ms2->motorID = MOTOR_ID_2;
+    ms2->pos_sign=1;
+    ms2->pwm_sign=-1;
     ms2->p_encoderTimer = p_encT2;
 	ms2->p_pwmTimer = p_pwmT2;
 	ms2->posLimMin = -3*PI;
@@ -75,7 +78,7 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
 	ms2->error_max = ms2->posLimMax - ms2->posLimMin;
 	ms2->Kpp=1000;
 	ms2->Tip=0;
-	ms2->Tdp=0;
+	ms2->Tdp=100;
 	///PWM variables
 	ms2->PWM_period = p_pwmT2->Init.Period;
 }
@@ -85,11 +88,11 @@ int Set_Duty_Cycle(Motor_state_t *ms, uint16_t dc1,uint16_t dc2){
 
 		  int rtn = 0;
 		  switch (ms->motorID){
-		  case 0:
+		  case MOTOR_ID_1:
 			  ms->p_pwmTimer->Instance->CCR2 = dc1;
 			  ms->p_pwmTimer->Instance->CCR3 = dc2;
 			  break;
-		  case 1:
+		  case MOTOR_ID_2:
 			  ms->p_pwmTimer->Instance->CCR1 = dc1;
 			  ms->p_pwmTimer->Instance->CCR2 = dc2;
 			  break;
@@ -101,7 +104,7 @@ int Set_Duty_Cycle(Motor_state_t *ms, uint16_t dc1,uint16_t dc2){
 }
 void PWM_Control_Motor(Motor_state_t *ms, int16_t speed){
 
-
+	speed = ms->pwm_sign * speed;
 	ms->dir = speed >=0 ? 1: -1;
 	ms->duty_cycle = speed * ms->dir;
 
@@ -117,7 +120,6 @@ void PWM_Control_Motor(Motor_state_t *ms, int16_t speed){
 
 
 if(motorEnable==1){
-	//Pull sleep pin on DRV8833 HIGH
 
 	if(ms->dir==1){
 		Set_Duty_Cycle(ms, ms->duty_cycle, 0);
@@ -169,14 +171,20 @@ void UpdateEncoder(Motor_state_t *ms){
 	    }
 	   }
 	ms->tick_position += ms->tick_velocity;
+
 	ms->last_counter_value = temp_counter;
 
-	//Sprememba predznaka zaradi vezave enkoderjev?
-	ms->position = (float)ms->tick_position * DIRECTION_SIGN* 2* PI / TICK_PER_REV; //[rad]
+	ms->position = (float)ms->tick_position  * ms->pos_sign* 2* PI / TICK_PER_REV; //[rad]
 
 	//velocity and low pass filter
-	ms->velocity = (float)ms->tick_velocity * DIRECTION_SIGN * 2* PI/ (TICK_PER_REV * Ts); //[rad/s]
+	ms->velocity = (float)ms->tick_velocity  * ms->pos_sign * 2* PI/ (TICK_PER_REV * Ts); //[rad/s]
 
+	// Motor 2 has some wrong wiring so encoder direction is wrong
+	// quick fix
+		if(ms->motorID==MOTOR_ID_2){
+			ms->position = -ms->position;
+			ms->velocity = -ms->velocity;
+		}
 	//Low pass filter 10rad/s
 	ms->velocity_f =  0.9048 *  ms->velocity_f_k_1 + 0.09516 * ms->velocity_k_1;
 	ms->velocity_k_1=ms->velocity;
@@ -255,25 +263,20 @@ void SetSpeedAd(Motor_state_t *ms, uint16_t ad_val){
 		UpdateEncoder(ms);
 		int16_t speed = (int16_t)2 * (float)ms->PWM_period/ADC_max*ad_val-ms->PWM_period;
 		PWM_Control_Motor(ms, speed);
-/*
-		if(ad_val >ADC_max * 0.51){
-		PWM_Control_Motor(ms, ms->PWM_period);
-		}
-		else if(ad_val <ADC_max * 0.49){
-				PWM_Control_Motor(ms, -ms->PWM_period);
-		}
-		else{
-			    PWM_Control_Motor(ms, 0);
-		}
-*/
 }
-//on off test of drv8833
-void test_DRV833(Motor_state_t *ms){
 
-uint32_t dc1, dc2;
-if(IN1_H == 1){dc1 = ms->PWM_period;} else {dc1=0;}
-if(IN2_H == 1){dc2 = ms->PWM_period;} else {dc2=0;}
-Set_Duty_Cycle(ms, dc1, dc2);
+void RefTraj1(Motor_state_t *ms){
+	static float delta = 0.005;
+	ms->position_ref = ms->position_ref + delta;
+
+	if(ms->position_ref >= ms->posLimMax){
+		ms->position_ref = ms->posLimMax;
+		delta=-delta;
+	}
+	else if(ms->position_ref <= ms->posLimMin){
+		ms->position_ref = ms->posLimMin;
+		delta=-delta;
+	}
 }
 
 void speed_ramp_test(Motor_state_t *ms){

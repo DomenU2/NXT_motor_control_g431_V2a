@@ -4,10 +4,14 @@
 #include <math.h>
 
 //DEFINES
-#define TICK_PER_REV 720 //n of encoder ticks per one revolution of axis
+//#define TICK_PER_REV 720 //n of encoder ticks per one revolution of axis
+#define TICK_PER_REV 360 //n of encoder ticks per one revolution of axis
 #define DIRECTION_SIGN -1
 #define PI 3.141592f
 #define RAD_2_DEG(x) (x*180/PI)
+
+#define MOTOR_ID_1 1
+#define MOTOR_ID_2 2
 
 // assume 10 ms sample time
 #define Ts 0.01f //Unit [s]
@@ -18,6 +22,7 @@
 typedef struct{
 
 	uint8_t motorID;
+
 	// ENCODER
 	TIM_HandleTypeDef *p_encoderTimer;
 	int16_t tick_velocity;
@@ -30,6 +35,7 @@ typedef struct{
 	float velocity;
 	float velocity_f; //filtered velocity
 	float position;
+	int8_t pos_sign;
 
 	//velocity
 	float velocity_k_1;
@@ -56,8 +62,8 @@ typedef struct{
 	TIM_HandleTypeDef *p_pwmTimer; //Pointer to HAL timer handle
 	uint16_t duty_cycle;
 	int8_t dir; //dir 1 of -1
-	uint16_t PWM_gain;
 	int16_t PWM_period;
+	int8_t pwm_sign;
 
 
 
@@ -68,6 +74,9 @@ typedef struct{
 //VARIABLES
 extern Motor_state_t motor_state1;
 extern Motor_state_t motor_state2;
+
+extern uint8_t motorEnable;
+extern uint8_t motorDriverEnable;
 
 void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2);
 
@@ -82,6 +91,10 @@ void UpdateEncoder(Motor_state_t *ms);
 
 // PD position control;
 void PD_position(Motor_state_t *ms);
+
+void RefTraj1(Motor_state_t *ms);
+
+
 //Set position reference with AD input
  void SetPosRefAd(Motor_state_t *ms, uint16_t ad_val);
 
