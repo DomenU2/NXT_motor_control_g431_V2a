@@ -66,6 +66,16 @@ uint8_t pos_idx=0;
 int16_t motor1_speed_dbg=0;
 int16_t motor2_speed_dbg=0;
 
+
+//CAN variables
+
+FDCAN_TxHeaderTypeDef CAN1_TxHeader={0};
+uint8_t can_tx_data[FDCAN_DLC_BYTES_8];
+uint8_t can_tx_cnt = 0;
+
+FDCAN_RxHeaderTypeDef CAN1_RxHeader={0};
+uint8_t can_rx_data[FDCAN_DLC_BYTES_8];
+uint8_t can_rx_cnt = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -129,6 +139,12 @@ int main(void)
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
+  // CAN start
+  if (HAL_FDCAN_Start(&hfdcan1))
+     {
+        Error_Handler();
+     }
+
 
   /*initialize motor */
   InitMotorControl(&motor_state1,&motor_state2);
@@ -146,9 +162,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-
-	HAL_Delay(10);
+	CAN1_TxHeader.Identifier = 0x667;
+	CAN1_TxHeader.IdType = FDCAN_STANDARD_ID;
+	CAN1_TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+	can_tx_data[0] = can_tx_cnt;
+	can_tx_data[1] = can_rx_cnt;
+	can_tx_cnt++;
+	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &CAN1_TxHeader,can_tx_data);
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	HAL_Delay(1000);
 
 
     /* USER CODE END WHILE */
@@ -285,9 +307,9 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 16;
+  hfdcan1.Init.NominalPrescaler = 40;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 2;
+  hfdcan1.Init.NominalTimeSeg1 = 14;
   hfdcan1.Init.NominalTimeSeg2 = 2;
   hfdcan1.Init.DataPrescaler = 1;
   hfdcan1.Init.DataSyncJumpWidth = 1;
@@ -301,7 +323,11 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
-
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+    {
+    /* Notification Error */
+       Error_Handler();
+    }
   /* USER CODE END FDCAN1_Init 2 */
 
 }
@@ -718,6 +744,19 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+// CAN interrupt
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+   UNUSED(RxFifo0ITs);
+	(void)HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &CAN1_RxHeader, can_rx_data);
+
+	if (CAN1_RxHeader.Identifier == 0x123){
+		can_rx_cnt++;
+	}
+}
+
+// Timer interrupt
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
 
@@ -781,6 +820,8 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+	  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	  HAL_Delay(100);
   }
   /* USER CODE END Error_Handler_Debug */
 }
