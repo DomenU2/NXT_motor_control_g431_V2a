@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "motorControl.h"
+#include "Can_Driver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,15 +68,13 @@ int16_t motor1_speed_dbg=0;
 int16_t motor2_speed_dbg=0;
 
 
-//CAN variables
+//CAN variables - test
 
-FDCAN_TxHeaderTypeDef CAN1_TxHeader={0};
+
 uint8_t can_tx_data[FDCAN_DLC_BYTES_8];
 uint8_t can_tx_cnt = 0;
+uint8_t can_rx_cnt=0;
 
-FDCAN_RxHeaderTypeDef CAN1_RxHeader={0};
-uint8_t can_rx_data[FDCAN_DLC_BYTES_8];
-uint8_t can_rx_cnt = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -162,13 +161,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	CAN1_TxHeader.Identifier = 0x667;
-	CAN1_TxHeader.IdType = FDCAN_STANDARD_ID;
-	CAN1_TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-	can_tx_data[0] = can_tx_cnt;
-	can_tx_data[1] = can_rx_cnt;
+	CAN_Message_t can_msg_1={0};
+	can_msg_1.Identifier = 0x667;
+	can_msg_1.IdType = FDCAN_STANDARD_ID;
+	can_msg_1.DataLength = FDCAN_DLC_BYTES_8;
+	can_msg_1.Data[0] = can_tx_cnt;
+	can_msg_1.Data[1] = can_rx_cnt;
 	can_tx_cnt++;
-	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &CAN1_TxHeader,can_tx_data);
+	Send_CAN_Message(&can_msg_1);
 	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	HAL_Delay(1000);
 
@@ -748,11 +748,15 @@ static void MX_GPIO_Init(void)
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
    UNUSED(RxFifo0ITs);
-	(void)HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &CAN1_RxHeader, can_rx_data);
+	(void)Receive_CAN_Message(hfdcan);
 
-	if (CAN1_RxHeader.Identifier == 0x123){
+
+	// for testing
+	if (can_rx_message.Identifier == 0x123){
 		can_rx_cnt++;
 	}
+
+
 }
 
 // Timer interrupt
