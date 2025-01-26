@@ -15,7 +15,7 @@ uint8_t motorDriverEnable = 0;
 
 Motor_state_t motor_state1={0};
 Motor_state_t motor_state2={0};
-
+Motor_state_t motor_stateDBG={0};
 
 int16_t ADC_max = 4095;
 
@@ -83,6 +83,21 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
 	ms2->PWM_period = p_pwmT2->Init.Period;
 }
 
+
+uint8_t Motor_Driver_Enable(Motor_state_t *ms1,Motor_state_t *ms2){
+
+	if(ms1->driver_enable==1 || ms1->driver_enable==1){
+		motorDriverEnable=1;
+		HAL_GPIO_WritePin(MOT_SLEEP_GPIO_Port, MOT_SLEEP_Pin, GPIO_PIN_SET);
+		//Pull sleep pin on DRV8833 HIGH
+	}
+	else{
+	   motorDriverEnable=0;
+	   HAL_GPIO_WritePin(MOT_SLEEP_GPIO_Port, MOT_SLEEP_Pin, GPIO_PIN_RESET);
+	   //Pull sleep pin on DRV8833 HIGH
+	}
+}
+
 int Set_Duty_Cycle(Motor_state_t *ms, uint16_t dc1,uint16_t dc2){
 
 
@@ -111,15 +126,7 @@ void PWM_Control_Motor(Motor_state_t *ms, int16_t speed){
 	if(ms->duty_cycle>ms->PWM_period){ms->duty_cycle=ms->PWM_period;}
 	else if(ms->duty_cycle<100){ms->duty_cycle=0;}
 
-	if(motorDriverEnable==1){
-		HAL_GPIO_WritePin(MOT_SLEEP_GPIO_Port, MOT_SLEEP_Pin, GPIO_PIN_SET);
-		//Pull sleep pin on DRV8833 HIGH
-	}else{
-		HAL_GPIO_WritePin(MOT_SLEEP_GPIO_Port, MOT_SLEEP_Pin, GPIO_PIN_RESET);
-	}
-
-
-if(motorEnable==1){
+if(ms->enable==1){
 
 	if(ms->dir==1){
 		Set_Duty_Cycle(ms, ms->duty_cycle, 0);
@@ -176,6 +183,8 @@ void UpdateEncoder(Motor_state_t *ms){
 
 	ms->position = (float)ms->tick_position  * ms->pos_sign* 2* PI / TICK_PER_REV; //[rad]
 
+
+
 	//velocity and low pass filter
 	ms->velocity = (float)ms->tick_velocity  * ms->pos_sign * 2* PI/ (TICK_PER_REV * Ts); //[rad/s]
 
@@ -199,23 +208,7 @@ void UpdateEncoder(Motor_state_t *ms){
 void PD_position(Motor_state_t *ms){
 
  //Regulacijska napaka in omejitve
-/*
-if(position_ref>0 && position_ref_k_1>=0)
-	{
-		   error= position_ref - position;
-		   position_ref_k_1=position_ref;
 
-	}else if(position_ref<0 && position_ref_k_1<=0)
-	{
-		 error= position_ref - position;
-		 position_ref_k_1=position_ref;
-	}else
-	{
-	  position_ref=0; //Reset value
-		position_ref_k_1=0;
-	}
-*/
-	//
 	ms->error= ms->position_ref - ms->position;
 	ms->position_ref_k_1=ms->position_ref;
 	float P,I,D;
@@ -224,9 +217,11 @@ if(position_ref>0 && position_ref_k_1>=0)
 
 		P = ms->Kpp * ms->error;
 
-		//I - Integralni del
-		// I =  I + error * Ts; //Integracija
-		// Id = 1/(Tip) * I * 0;
+#if 0
+		I - Integralni del
+		 I =  I + error * Ts; //Integracija
+		 Id = 1/(Tip) * I * 0;
+#endif
 
 		//D - Diferencialni del
 		D =    ms->Tdp/Ts * (ms->error - ms->error_k_1);
@@ -279,6 +274,8 @@ void RefTraj1(Motor_state_t *ms){
 	}
 }
 
+
+// open loop pwm test motor
 void speed_ramp_test(Motor_state_t *ms){
 
 	static int8_t sgn = 1;
@@ -291,5 +288,112 @@ PWM_Control_Motor(ms, speed_ramp);
 // en korak nadzorne zanke
 void MotorControl(Motor_state_t *ms){
 	UpdateEncoder(ms);
+#if 0
 	PD_position(ms);
+#endif
 }
+
+
+// CAN Send recieve functions for motor state and commands
+uint8_t Motor_Send_Pos_Vel_CAN(Motor_state_t *ms){
+
+	uint8_t ret=0;
+	CAN_Message_t can_msg={0};
+	struct mcan_m_pos_vel_1_t pos_vel_msg={0};
+
+	switch(ms->motorID){
+	case MOTOR_ID_1:
+		can_msg.Identifier = MCAN_M_POS_VEL_1_FRAME_ID;
+		can_msg.IdType = FDCAN_STANDARD_ID;
+		can_msg.DataLength = FDCAN_DLC_BYTES_8;
+		pos_vel_msg.position = mcan_m_pos_vel_1_position_encode(ms->position);
+		pos_vel_msg.velocity= mcan_m_pos_vel_1_velocity_encode(ms->velocity);
+
+		mcan_m_pos_vel_1_pack(&can_msg.Data, &pos_vel_msg, MCAN_M_POS_VEL_1_LENGTH);
+
+		Send_CAN_Message(&can_msg);
+	case MOTOR_ID_2:
+		can_msg.Identifier = MCAN_M_POS_VEL_2_FRAME_ID;
+		can_msg.IdType = FDCAN_STANDARD_ID;
+		can_msg.DataLength = FDCAN_DLC_BYTES_8;
+		pos_vel_msg.position = mcan_m_pos_vel_2_position_encode(ms->position);
+		pos_vel_msg.velocity= mcan_m_pos_vel_2_velocity_encode(ms->velocity_f);
+
+		mcan_m_pos_vel_2_pack(&can_msg.Data, &pos_vel_msg, MCAN_M_POS_VEL_2_LENGTH);
+
+		Send_CAN_Message(&can_msg);
+		break;
+	default:
+		ret=1;
+		break;
+	}
+	return ret;
+
+}
+
+uint8_t Motor_Send_Status_CAN(Motor_state_t *ms){
+
+	uint8_t ret=0;
+	CAN_Message_t can_msg={0};
+	struct mcan_m_status_1_t status_msg={0};
+
+	switch(ms->motorID){
+	case MOTOR_ID_1:
+		can_msg.Identifier = MCAN_M_STATUS_1_FRAME_ID;
+		can_msg.IdType = FDCAN_STANDARD_ID;
+		can_msg.DataLength = FDCAN_DLC_BYTES_8;
+
+		status_msg.m_drive_en = ms->driver_enable;
+		status_msg.m_en = ms->enable;
+		status_msg.m_error = ms->error_code;
+		status_msg.m_mode = ms->mode;
+
+		mcan_m_status_1_pack(&can_msg.Data, &status_msg, MCAN_M_STATUS_1_LENGTH);
+
+		Send_CAN_Message(&can_msg);
+	case MOTOR_ID_2:
+		can_msg.Identifier = MCAN_M_STATUS_2_FRAME_ID;
+		can_msg.IdType = FDCAN_STANDARD_ID;
+		can_msg.DataLength = FDCAN_DLC_BYTES_8;
+
+		status_msg.m_drive_en = ms->driver_enable;
+		status_msg.m_en = ms->enable;
+		status_msg.m_error = ms->error_code;
+		status_msg.m_mode = ms->mode;
+
+		mcan_m_status_2_pack(&can_msg.Data, &status_msg, MCAN_M_STATUS_2_LENGTH);
+
+		Send_CAN_Message(&can_msg);
+		break;
+	default:
+		ret=1;
+		break;
+	}
+	return ret;
+}
+
+
+uint8_t Motor_Update_Ref_CAN(CAN_Message_t *can_msg, Motor_state_t *ms){
+
+	uint8_t ret=0;
+	struct mcan_m_ref_2_t m_ref_msg={0};
+	mcan_m_ref_2_unpack(&m_ref_msg, can_msg->Data,MCAN_M_REF_1_LENGTH);
+	ms->position_ref = mcan_m_ref_1_position_decode(m_ref_msg.position);
+	ms->velocity_ref = mcan_m_ref_1_velocity_decode(m_ref_msg.velocity);
+
+	return ret;
+}
+
+uint8_t Motor_Update_Command_CAN(CAN_Message_t *can_msg, Motor_state_t *ms){
+
+	uint8_t ret=0;
+	struct mcan_m_command_1_t m_command_msg={0};
+	mcan_m_command_2_unpack(&m_command_msg, can_msg->Data,MCAN_M_COMMAND_1_LENGTH);
+
+	ms->driver_enable = m_command_msg.m_drive_en;
+	ms->enable = m_command_msg.m_en;
+	ms->mode = m_command_msg.m_mode;
+	return ret;
+
+}
+

@@ -2,6 +2,9 @@
 #define _MOTOR_CONTROL_H
 #include "main.h"
 #include <math.h>
+#include "Can_Driver.h"
+#include "mcan.h"
+#include "common.h"
 
 //DEFINES
 //#define TICK_PER_REV 720 //n of encoder ticks per one revolution of axis
@@ -16,23 +19,29 @@
 // assume 10 ms sample time
 #define Ts 0.01f //Unit [s]
 
-//Types
 
+
+//Types
+typedef enum{
+	STOP_MODE=0,
+	POSITION_MODE=1,
+	VELOCITY_MODE=2,
+	COAST_MODE=3
+}MotorMode_e;
 
 typedef struct{
 
 	uint8_t motorID;
 
-	// ENCODER
-	TIM_HandleTypeDef *p_encoderTimer;
-	int16_t tick_velocity;
-	int64_t tick_position;
-
-	uint32_t last_counter_value;
-
+	//command
+	bool driver_enable;
+	bool enable;
+	MotorMode_e mode;
+	uint8_t error_code;
 
 	//position
 	float velocity;
+	float velocity_ref;
 	float velocity_f; //filtered velocity
 	float position;
 	int8_t pos_sign;
@@ -58,6 +67,14 @@ typedef struct{
 	float Tip;
 	float Tdp;
 
+
+	// ENCODER
+	TIM_HandleTypeDef *p_encoderTimer;
+	int16_t tick_velocity;
+	int64_t tick_position;
+	uint32_t last_counter_value;
+
+
 	///PWM variables
 	TIM_HandleTypeDef *p_pwmTimer; //Pointer to HAL timer handle
 	uint16_t duty_cycle;
@@ -75,10 +92,14 @@ typedef struct{
 extern Motor_state_t motor_state1;
 extern Motor_state_t motor_state2;
 
+extern Motor_state_t motor_stateDBG;
+
 extern uint8_t motorEnable;
 extern uint8_t motorDriverEnable;
 
 void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2);
+
+uint8_t Motor_Driver_Enable(Motor_state_t *ms1,Motor_state_t *ms2);
 
 int Set_Duty_Cycle(Motor_state_t *ms, uint16_t dc1,uint16_t dc2);
 
@@ -103,4 +124,10 @@ void RefTraj1(Motor_state_t *ms);
  void speed_ramp_test(Motor_state_t *ms);
 
  void MotorControl(Motor_state_t *ms);
+
+ uint8_t Motor_Send_Pos_Vel_CAN(Motor_state_t *ms);
+ uint8_t Motor_Send_Status_CAN(Motor_state_t *ms);
+ uint8_t Motor_Update_Ref_CAN(CAN_Message_t *can_msg, Motor_state_t *ms);
+ uint8_t Motor_Update_Command_CAN(CAN_Message_t *can_msg, Motor_state_t *ms);
+
 #endif 

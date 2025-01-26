@@ -748,13 +748,37 @@ static void MX_GPIO_Init(void)
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
    UNUSED(RxFifo0ITs);
-	(void)Receive_CAN_Message(hfdcan);
+
+
+	(void)Receive_CAN_Message(hfdcan, &can_rx_message);
 
 
 	// for testing
-	if (can_rx_message.Identifier == 0x123){
-		can_rx_cnt++;
+	switch (can_rx_message.Identifier){
+
+	case 0x123:
+	can_rx_cnt++;
+	break;
+
+	case MCAN_M_REF_1_FRAME_ID:
+	Motor_Update_Ref_CAN(&can_rx_message, &motor_state1);
+	break;
+
+	case MCAN_M_REF_2_FRAME_ID:
+	Motor_Update_Ref_CAN(&can_rx_message, &motor_state2);
+	break;
+
+	case MCAN_M_COMMAND_1_FRAME_ID:
+	Motor_Update_Command_CAN(&can_rx_message, &motor_state1);
+	break;
+
+	case MCAN_M_COMMAND_2_FRAME_ID:
+	Motor_Update_Command_CAN(&can_rx_message, &motor_state2);
+	break;
+
 	}
+
+
 
 
 }
@@ -766,20 +790,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 
 	if(htim == &htim6){
 
+
 #if 0
-		if(time_cnt%500==0){
-			time_cnt=0;
 
-			   motor_state1.position_ref =pos_ref_dbg[pos_idx];
-			   motor_state2.position_ref =pos_ref_dbg[pos_idx];
-			   pos_idx++;
-			   pos_idx%=3;
-		   }
-		time_cnt++;
-#endif
-
-#if 1
-time_cnt++;
 		if(time_cnt >= 1000){
 			motorEnable=1;
 			motorDriverEnable=1;
@@ -788,13 +801,33 @@ time_cnt++;
 						RefTraj1(&motor_state1);
 						RefTraj1(&motor_state2);
 					}
+#endif
+		}
+
+		//Send CAN statuses
+		if(time_cnt % 20 == 0){
+			Motor_Send_Pos_Vel_CAN(&motor_state1);
+		}
+		else if(time_cnt % 22 == 0){
+			Motor_Send_Pos_Vel_CAN(&motor_state2);
+		}
+		else if(time_cnt % 24 == 0){
+			Motor_Send_Status_CAN(&motor_state1);
+		}
+		else if(time_cnt % 26 == 0){
+			Motor_Send_Status_CAN(&motor_state2);
 		}
 
 
+		Motor_Driver_Enable(&motor_state1,&motor_state2);
 		MotorControl(&motor_state1);
 		MotorControl(&motor_state2);
+		time_cnt++;
+
+
+
+
 		  /* open loop ramp speed control */
-#endif
 
 #if 0
 		PWM_Control_Motor(&motor_state1, motor1_speed_dbg);
@@ -808,7 +841,7 @@ time_cnt++;
 	  UpdateEncoder(&motor_state1);
 	  UpdateEncoder(&motor_state2);
 #endif
-	}
+
 }
 
 /* USER CODE END 4 */

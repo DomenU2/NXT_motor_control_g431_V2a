@@ -42,14 +42,15 @@ uint8_t Send_CAN_Message(CAN_Message_t *can_tx_msg){
 }
 
 
-uint8_t Receive_CAN_Message(FDCAN_HandleTypeDef *hfdcan){
+uint8_t Receive_CAN_Message(FDCAN_HandleTypeDef *hfdcan,CAN_Message_t *can_rx_message){
 
-	(void)HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &CAN1_RxHeader, can_rx_message.Data);
+	(void)HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &CAN1_RxHeader, can_rx_message->Data);
 
-	can_rx_message.DataLength = CAN1_RxHeader.DataLength;
-	can_rx_message.IdType = CAN1_RxHeader.IdType;
-	can_rx_message.Identifier = CAN1_RxHeader.Identifier;
+	can_rx_message->DataLength = CAN1_RxHeader.DataLength;
+	can_rx_message->IdType = CAN1_RxHeader.IdType;
+	can_rx_message->Identifier = CAN1_RxHeader.Identifier;
 
 	//Data unpacking, scaling and saving here
 return 0;
 }
+
