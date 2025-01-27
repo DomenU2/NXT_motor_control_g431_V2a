@@ -19,6 +19,8 @@
 // assume 10 ms sample time
 #define Ts 0.01f //Unit [s]
 
+#define MCAN_MSG_PERIOD 10
+
 
 
 //Types
@@ -129,5 +131,6 @@ void RefTraj1(Motor_state_t *ms);
  uint8_t Motor_Send_Status_CAN(Motor_state_t *ms);
  uint8_t Motor_Update_Ref_CAN(CAN_Message_t *can_msg, Motor_state_t *ms);
  uint8_t Motor_Update_Command_CAN(CAN_Message_t *can_msg, Motor_state_t *ms);
+ void Motor_Send_Messages_CAN();
 
 #endif 

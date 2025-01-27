@@ -161,14 +161,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	CAN_Message_t can_msg_1={0};
-	can_msg_1.Identifier = 0x667;
-	can_msg_1.IdType = FDCAN_STANDARD_ID;
-	can_msg_1.DataLength = FDCAN_DLC_BYTES_8;
-	can_msg_1.Data[0] = can_tx_cnt;
-	can_msg_1.Data[1] = can_rx_cnt;
-	can_tx_cnt++;
-	Send_CAN_Message(&can_msg_1);
 	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	HAL_Delay(1000);
 
@@ -792,11 +784,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 
 
 #if 0
-
-		if(time_cnt >= 1000){
-			motorEnable=1;
-			motorDriverEnable=1;
-
 			if(time_cnt % 1 == 0){
 						RefTraj1(&motor_state1);
 						RefTraj1(&motor_state2);
@@ -804,43 +791,19 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 #endif
 		}
 
-		//Send CAN statuses
-		if(time_cnt % 20 == 0){
-			Motor_Send_Pos_Vel_CAN(&motor_state1);
-		}
-		else if(time_cnt % 22 == 0){
-			Motor_Send_Pos_Vel_CAN(&motor_state2);
-		}
-		else if(time_cnt % 24 == 0){
-			Motor_Send_Status_CAN(&motor_state1);
-		}
-		else if(time_cnt % 26 == 0){
-			Motor_Send_Status_CAN(&motor_state2);
-		}
 
 
 		Motor_Driver_Enable(&motor_state1,&motor_state2);
+#if 1
 		MotorControl(&motor_state1);
 		MotorControl(&motor_state2);
+#endif
 		time_cnt++;
-
-
+		//Send CAN statuses
+		Motor_Send_Messages_CAN();
 
 
 		  /* open loop ramp speed control */
-
-#if 0
-		PWM_Control_Motor(&motor_state1, motor1_speed_dbg);
-		UpdateEncoder(&motor_state1);
-		PWM_Control_Motor(&motor_state2, motor2_speed_dbg);
-		UpdateEncoder(&motor_state2);
-#endif
-#if 0
-	  speed_ramp_test(&motor_state1);
-	  speed_ramp_test(&motor_state2);
-	  UpdateEncoder(&motor_state1);
-	  UpdateEncoder(&motor_state2);
-#endif
 
 }
 

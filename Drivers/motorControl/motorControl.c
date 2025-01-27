@@ -28,6 +28,14 @@ float limitHighDbg = 360; //deg
 float position_deg = 0;
 float limitLowDbg = 0; //deg
 
+
+// CAN messages TX
+CAN_Message_t can_msg1={0};
+struct mcan_m_pos_vel_1_t pos_vel_msg1={0};
+CAN_Message_t can_msg2={0};
+struct mcan_m_pos_vel_2_t pos_vel_msg2={0};
+
+
 //Functions
 
 void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
@@ -288,9 +296,8 @@ PWM_Control_Motor(ms, speed_ramp);
 // en korak nadzorne zanke
 void MotorControl(Motor_state_t *ms){
 	UpdateEncoder(ms);
-#if 0
 	PD_position(ms);
-#endif
+
 }
 
 
@@ -298,30 +305,30 @@ void MotorControl(Motor_state_t *ms){
 uint8_t Motor_Send_Pos_Vel_CAN(Motor_state_t *ms){
 
 	uint8_t ret=0;
-	CAN_Message_t can_msg={0};
-	struct mcan_m_pos_vel_1_t pos_vel_msg={0};
+
 
 	switch(ms->motorID){
 	case MOTOR_ID_1:
-		can_msg.Identifier = MCAN_M_POS_VEL_1_FRAME_ID;
-		can_msg.IdType = FDCAN_STANDARD_ID;
-		can_msg.DataLength = FDCAN_DLC_BYTES_8;
-		pos_vel_msg.position = mcan_m_pos_vel_1_position_encode(ms->position);
-		pos_vel_msg.velocity= mcan_m_pos_vel_1_velocity_encode(ms->velocity);
+		can_msg1.Identifier = MCAN_M_POS_VEL_1_FRAME_ID;
+		can_msg1.IdType = FDCAN_STANDARD_ID;
+		can_msg1.DataLength = FDCAN_DLC_BYTES_8;
+		pos_vel_msg1.position = mcan_m_pos_vel_1_position_encode(ms->position);
+		pos_vel_msg1.velocity= mcan_m_pos_vel_1_velocity_encode(ms->velocity_f);
 
-		mcan_m_pos_vel_1_pack(&can_msg.Data, &pos_vel_msg, MCAN_M_POS_VEL_1_LENGTH);
+		mcan_m_pos_vel_1_pack(&can_msg1.Data, &pos_vel_msg1, MCAN_M_POS_VEL_1_LENGTH);
 
-		Send_CAN_Message(&can_msg);
+		Send_CAN_Message(&can_msg1);
+		break;
 	case MOTOR_ID_2:
-		can_msg.Identifier = MCAN_M_POS_VEL_2_FRAME_ID;
-		can_msg.IdType = FDCAN_STANDARD_ID;
-		can_msg.DataLength = FDCAN_DLC_BYTES_8;
-		pos_vel_msg.position = mcan_m_pos_vel_2_position_encode(ms->position);
-		pos_vel_msg.velocity= mcan_m_pos_vel_2_velocity_encode(ms->velocity_f);
+		can_msg2.Identifier = MCAN_M_POS_VEL_2_FRAME_ID;
+		can_msg2.IdType = FDCAN_STANDARD_ID;
+		can_msg2.DataLength = FDCAN_DLC_BYTES_8;
+		pos_vel_msg2.position = mcan_m_pos_vel_2_position_encode(ms->position);
+		pos_vel_msg2.velocity= mcan_m_pos_vel_2_velocity_encode(ms->velocity_f);
 
-		mcan_m_pos_vel_2_pack(&can_msg.Data, &pos_vel_msg, MCAN_M_POS_VEL_2_LENGTH);
+		mcan_m_pos_vel_2_pack(&can_msg2.Data, &pos_vel_msg2, MCAN_M_POS_VEL_2_LENGTH);
 
-		Send_CAN_Message(&can_msg);
+		Send_CAN_Message(&can_msg2);
 		break;
 	default:
 		ret=1;
@@ -349,8 +356,8 @@ uint8_t Motor_Send_Status_CAN(Motor_state_t *ms){
 		status_msg.m_mode = ms->mode;
 
 		mcan_m_status_1_pack(&can_msg.Data, &status_msg, MCAN_M_STATUS_1_LENGTH);
-
 		Send_CAN_Message(&can_msg);
+		break;
 	case MOTOR_ID_2:
 		can_msg.Identifier = MCAN_M_STATUS_2_FRAME_ID;
 		can_msg.IdType = FDCAN_STANDARD_ID;
@@ -370,6 +377,33 @@ uint8_t Motor_Send_Status_CAN(Motor_state_t *ms){
 		break;
 	}
 	return ret;
+}
+
+void Motor_Send_Messages_CAN(){
+	//Send CAN statuses
+	static uint32_t time_cnt=0;
+	static uint8_t msgn=0;
+	if(time_cnt % MCAN_MSG_PERIOD == 0){
+
+		time_cnt=0;
+		msgn++;
+		msgn%=4;
+	}
+
+	switch(msgn){
+	case 0:
+		Motor_Send_Pos_Vel_CAN(&motor_state1);
+		break;
+	case 1:
+		Motor_Send_Pos_Vel_CAN(&motor_state2);
+			break;
+	case 2:
+		Motor_Send_Status_CAN(&motor_state1);
+			break;
+	case 3:
+		Motor_Send_Status_CAN(&motor_state2);
+			break;
+	}
 }
 
 
