@@ -59,36 +59,57 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
 	  HAL_TIM_PWM_Start(p_pwmT2 , TIM_CHANNEL_2);
 
     //definicija vrednosti konstant
-	//PID variables
+
     ms1->motorID = MOTOR_ID_1;
     ms1->pos_sign=-1;
     ms1->pwm_sign=1;
     ms1->p_encoderTimer = p_encT1;
     ms1->p_pwmTimer = p_pwmT1;
-    ms1->posLimMin = -PI;
-    ms1->posLimMax = PI;
-    ms1->error_max = ms1->posLimMax - ms1->posLimMin;
-    ms1->Kpp=1000; //6000
-    ms1->Tip=0;
-    ms1->Tdp=100; //500
-
-	///PWM variables
+    ///PWM variables
     ms1->PWM_period = p_pwmT1->Init.Period;
 
+    //PID position
+    ms1->reg_pos.limMin = -3*PI;
+    ms1->reg_pos.limMax = 3*PI;
+    ms1->reg_pos.error_max = ms1->reg_pos.limMax - ms1->reg_pos.limMin;
+    ms1->reg_pos.Kpp=600;
+    ms1->reg_pos.Tip=1;
+    ms1->reg_pos.Tdp=80;
 
-    ms2->motorID = MOTOR_ID_2;
-    ms2->pos_sign=1;
-    ms2->pwm_sign=-1;
-    ms2->p_encoderTimer = p_encT2;
-	ms2->p_pwmTimer = p_pwmT2;
-	ms2->posLimMin = -3*PI;
-	ms2->posLimMax = 3*PI;
-	ms2->error_max = ms2->posLimMax - ms2->posLimMin;
-	ms2->Kpp=1000;
-	ms2->Tip=0;
-	ms2->Tdp=100;
-	///PWM variables
-	ms2->PWM_period = p_pwmT2->Init.Period;
+    //PID speed
+     ms1->reg_speed.limMin = -500*PI;
+     ms1->reg_speed.limMax = 500*PI;
+     ms1->reg_speed.error_max = ms1->reg_speed.limMax - ms1->reg_speed.limMin;
+     ms1->reg_speed.Kpp=1;
+     ms1->reg_speed.Tip=1e6;
+     ms1->reg_speed.Tdp=1;
+
+
+// MOTOR 2
+
+     ms2->motorID = MOTOR_ID_1;
+     ms2->pos_sign=-1;
+     ms2->pwm_sign=1;
+     ms2->p_encoderTimer = p_encT1;
+     ms2->p_pwmTimer = p_pwmT1;
+     ///PWM variables
+     ms2->PWM_period = p_pwmT1->Init.Period;
+
+     //PID position
+     ms2->reg_pos.limMin = -3*PI;
+     ms2->reg_pos.limMax = 3*PI;
+     ms2->reg_pos.error_max = ms2->reg_pos.limMax - ms2->reg_pos.limMin;
+     ms2->reg_pos.Kpp=600;
+     ms2->reg_pos.Tip=1;
+     ms2->reg_pos.Tdp=80;
+
+     //PID speed
+      ms2->reg_speed.limMin = -500*PI;
+      ms2->reg_speed.limMax = 500*PI;
+      ms2->reg_speed.error_max = ms2->reg_speed.limMax - ms2->reg_speed.limMin;
+      ms2->reg_speed.Kpp=1;
+      ms2->reg_speed.Tip=1e6;
+      ms2->reg_speed.Tdp=1;
 }
 
 
@@ -217,67 +238,99 @@ void PD_position(Motor_state_t *ms){
 
  //Regulacijska napaka in omejitve
 
-	ms->error= ms->position_ref - ms->position;
-	ms->position_ref_k_1=ms->position_ref;
-	float P,I,D;
-	if(ms->error<=ms->error_max && ms->error>=-ms->error_max){
+	ms->reg_pos.error= ms->reg_pos.ref - ms->position;
+	ms->reg_pos.ref_k_1=ms->reg_pos.ref;
+	float P,I,D, Id=0;
+	if(ms->reg_pos.error<=ms->reg_pos.error_max && ms->reg_pos.error>=-ms->reg_pos.error_max){
 		//P - proporcionalni del
 
-		P = ms->Kpp * ms->error;
+		P = ms->reg_pos.Kpp * ms->reg_pos.error;
 
-#if 0
-		I - Integralni del
-		 I =  I + error * Ts; //Integracija
-		 Id = 1/(Tip) * I * 0;
+#if 1
+		//I - Integralni del
+		ms->reg_pos.I =  ms->reg_pos.I + ms->reg_pos.error * Ts; //Integracija
+		ms->reg_pos.Id = 1/(ms->reg_pos.Tip) * ms->reg_pos.I;
 #endif
 
 		//D - Diferencialni del
-		D =    ms->Tdp/Ts * (ms->error - ms->error_k_1);
+		D =    ms->reg_pos.Tdp/Ts * (ms->reg_pos.error - ms->reg_pos.error_k_1);
 
 
 		// Izhod regulatorja
 	//	u_k = P +Id + D;
-		ms->u_k = P + D;
-		ms->error_k_1 = ms->error;
+#if 0
+		ms->reg_pos.u_k = P + D;
+#endif
+		ms->reg_pos.u_k = P +Id + D;
+
+		ms->reg_pos.error_k_1 = ms->reg_pos.error;
 
 		}
 else{
-	ms->u_k = 0;
+	ms->reg_pos.u_k = 0;
 }
 
 
 #if 1
-	PWM_Control_Motor(ms, ms->u_k);
+	PWM_Control_Motor(ms, ms->reg_pos.u_k);
 #endif
 
 }//End PID position
 
-//set position reference with potenciometeer
-void SetPosRefAd(Motor_state_t *ms, uint16_t ad_val){
+void PI_speed(Motor_state_t *ms){
 
-	ms->position_ref = (ms->posLimMax - ms->posLimMin) /ADC_max * (float)ad_val + ms->posLimMin;
+ //Regulacijska napaka in omejitve
 
-}
-int16_t speed = 0;
-int16_t dir = 0;
+	ms->reg_speed.error= ms->reg_speed.ref - ms->velocity_f;
+	ms->reg_speed.ref_k_1=ms->reg_speed.ref;
+	float P, Id=0;
+	//limiting
+#if 0
+	if(ms->reg_speed.error<=ms->reg_speed.error_max){
+		ms->reg_speed.error=ms->reg_speed.error_max;
+	}
+	else if (ms->reg_speed.error>=-ms->reg_speed.error_max){
+		ms->reg_speed.error=-ms->reg_speed.error_max;
+		}
+#endif
+		//P - proporcionalni del
 
-// open loop control
-void SetSpeedAd(Motor_state_t *ms, uint16_t ad_val){
-		UpdateEncoder(ms);
-		int16_t speed = (int16_t)2 * (float)ms->PWM_period/ADC_max*ad_val-ms->PWM_period;
-		PWM_Control_Motor(ms, speed);
-}
+		P = ms->reg_speed.Kpp * ms->reg_speed.error;
+
+#if 1
+		//I - Integralni del
+		ms->reg_speed.I =  ms->reg_speed.I + ms->reg_speed.error * Ts; //Integracija
+		ms->reg_speed.Id = 1/(ms->reg_speed.Tip) * ms->reg_speed.I;
+#endif
+
+		// Izhod regulatorja
+
+
+		ms->reg_speed.u_k = P + ms->reg_speed.Id;
+
+		ms->reg_speed.error_k_1 = ms->reg_speed.error;
+
+
+
+
+#if 1
+	PWM_Control_Motor(ms, ms->reg_speed.u_k);
+#endif
+
+}//End PID position
+
+
 
 void RefTraj1(Motor_state_t *ms){
 	static float delta = 0.005;
-	ms->position_ref = ms->position_ref + delta;
+	ms->reg_pos.ref = ms->reg_pos.ref + delta;
 
-	if(ms->position_ref >= ms->posLimMax){
-		ms->position_ref = ms->posLimMax;
+	if(ms->reg_pos.ref >= ms->reg_pos.limMax){
+		ms->reg_pos.ref = ms->reg_pos.limMax;
 		delta=-delta;
 	}
-	else if(ms->position_ref <= ms->posLimMin){
-		ms->position_ref = ms->posLimMin;
+	else if(ms->reg_pos.ref <= ms->reg_pos.limMin){
+		ms->reg_pos.ref = ms->reg_pos.limMin;
 		delta=-delta;
 	}
 }
@@ -296,7 +349,20 @@ PWM_Control_Motor(ms, speed_ramp);
 // en korak nadzorne zanke
 void MotorControl(Motor_state_t *ms){
 	UpdateEncoder(ms);
-	PD_position(ms);
+	switch (ms->mode){
+	case STOP_MODE:
+	break;
+	case POSITION_MODE:
+		PD_position(ms);
+	break;
+	case VELOCITY_MODE:
+		PI_speed(ms);
+	break;
+	case COAST_MODE:
+	break;
+	}
+
+
 
 }
 
@@ -391,8 +457,8 @@ uint8_t Motor_Send_Diag_CAN(Motor_state_t *ms){
 		can_msg.IdType = FDCAN_STANDARD_ID;
 		can_msg.DataLength = FDCAN_DLC_BYTES_8;
 
-		diag_msg.reg_out = mcan_m_diag_1_reg_out_encode(ms->u_k);
-		diag_msg.er = mcan_m_diag_1_er_encode(ms->error);
+		diag_msg.reg_out = mcan_m_diag_1_reg_out_encode(ms->reg_pos.u_k);
+		diag_msg.er = mcan_m_diag_1_er_encode(ms->reg_pos.error);
 		mcan_m_diag_1_pack(&can_msg.Data, &diag_msg,MCAN_M_DIAG_1_LENGTH);
 		Send_CAN_Message(&can_msg);
 		break;
@@ -401,8 +467,8 @@ uint8_t Motor_Send_Diag_CAN(Motor_state_t *ms){
 		can_msg.IdType = FDCAN_STANDARD_ID;
 		can_msg.DataLength = FDCAN_DLC_BYTES_8;
 
-		diag_msg.reg_out = mcan_m_diag_2_reg_out_encode(ms->u_k);
-		diag_msg.er = mcan_m_diag_2_er_encode(ms->error);
+		diag_msg.reg_out = mcan_m_diag_2_reg_out_encode(ms->reg_pos.u_k);
+		diag_msg.er = mcan_m_diag_2_er_encode(ms->reg_pos.error);
 		mcan_m_diag_2_pack(&can_msg.Data, &diag_msg,MCAN_M_DIAG_2_LENGTH);
 		Send_CAN_Message(&can_msg);
 		break;
@@ -454,8 +520,8 @@ uint8_t Motor_Update_Ref_CAN(CAN_Message_t *can_msg, Motor_state_t *ms){
 	uint8_t ret=0;
 	struct mcan_m_ref_2_t m_ref_msg={0};
 	mcan_m_ref_2_unpack(&m_ref_msg, can_msg->Data,MCAN_M_REF_1_LENGTH);
-	ms->position_ref = mcan_m_ref_1_position_decode(m_ref_msg.position);
-	ms->velocity_ref = mcan_m_ref_1_velocity_decode(m_ref_msg.velocity);
+	ms->reg_pos.ref = mcan_m_ref_1_position_decode(m_ref_msg.position);
+	ms->reg_speed.ref = mcan_m_ref_1_velocity_decode(m_ref_msg.velocity);
 
 	return ret;
 }

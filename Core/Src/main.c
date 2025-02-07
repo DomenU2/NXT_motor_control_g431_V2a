@@ -754,11 +754,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
 	case MCAN_M_REF_1_FRAME_ID:
 	Motor_Update_Ref_CAN(&can_rx_message, &motor_state1);
-	motor_state2.position_ref = motor_state1.position_ref;
-	motor_state2.velocity_ref = motor_state1.velocity_ref;
 	break;
 
-#if 0
+#if 1
 	case MCAN_M_REF_2_FRAME_ID:
 	Motor_Update_Ref_CAN(&can_rx_message, &motor_state2);
 	break;

@@ -32,6 +32,24 @@ typedef enum{
 }MotorMode_e;
 
 typedef struct{
+	//PID variables
+	float ref;
+	float limMin;
+	float limMax;
+	float ref_k_1;
+	float error;
+	float error_k_1;
+	float error_max;
+	float Id;
+	float I;
+	float u_k;
+	float u_k_1;
+	float Kpp;
+	float Tip;
+	float Tdp;
+}PID_t;
+
+typedef struct{
 
 	uint8_t motorID;
 
@@ -43,7 +61,6 @@ typedef struct{
 
 	//position
 	float velocity;
-	float velocity_ref;
 	float velocity_f; //filtered velocity
 	float position;
 	int8_t pos_sign;
@@ -53,23 +70,8 @@ typedef struct{
 	float velocity_f_k_1;
 
 
-	//PID variables
-	float position_ref;
-	float posLimMin;
-	float posLimMax;
-	float position_ref_k_1;
-	float error;
-	float error_k_1;
-
-	float error_max;
-	float u_k;
-	float u_k_1;
-	//float Kpp=0.825, Tip=1000, Tdp=0.0184;
-	float Kpp;
-	float Tip;
-	float Tdp;
-
-
+	PID_t reg_pos;
+	PID_t reg_speed;
 	// ENCODER
 	TIM_HandleTypeDef *p_encoderTimer;
 	int16_t tick_velocity;
