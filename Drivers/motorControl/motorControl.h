@@ -19,7 +19,7 @@
 // assume 10 ms sample time
 #define Ts 0.01f //Unit [s]
 
-#define MCAN_MSG_PERIOD 10
+#define MCAN_MSG_PERIOD 5
 
 
 

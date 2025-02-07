@@ -379,6 +379,40 @@ uint8_t Motor_Send_Status_CAN(Motor_state_t *ms){
 	return ret;
 }
 
+uint8_t Motor_Send_Diag_CAN(Motor_state_t *ms){
+
+	uint8_t ret=0;
+	CAN_Message_t can_msg={0};
+	struct mcan_m_diag_1_t diag_msg={0};
+
+	switch(ms->motorID){
+	case MOTOR_ID_1:
+		can_msg.Identifier = MCAN_M_DIAG_1_FRAME_ID;
+		can_msg.IdType = FDCAN_STANDARD_ID;
+		can_msg.DataLength = FDCAN_DLC_BYTES_8;
+
+		diag_msg.reg_out = mcan_m_diag_1_reg_out_encode(ms->u_k);
+		diag_msg.er = mcan_m_diag_1_er_encode(ms->error);
+		mcan_m_diag_1_pack(&can_msg.Data, &diag_msg,MCAN_M_DIAG_1_LENGTH);
+		Send_CAN_Message(&can_msg);
+		break;
+	case MOTOR_ID_2:
+		can_msg.Identifier = MCAN_M_DIAG_2_FRAME_ID;
+		can_msg.IdType = FDCAN_STANDARD_ID;
+		can_msg.DataLength = FDCAN_DLC_BYTES_8;
+
+		diag_msg.reg_out = mcan_m_diag_2_reg_out_encode(ms->u_k);
+		diag_msg.er = mcan_m_diag_2_er_encode(ms->error);
+		mcan_m_diag_2_pack(&can_msg.Data, &diag_msg,MCAN_M_DIAG_2_LENGTH);
+		Send_CAN_Message(&can_msg);
+		break;
+	default:
+		ret=1;
+		break;
+	}
+	return ret;
+}
+
 void Motor_Send_Messages_CAN(){
 	//Send CAN statuses
 	static uint32_t time_cnt=0;
@@ -387,7 +421,7 @@ void Motor_Send_Messages_CAN(){
 
 		time_cnt=0;
 		msgn++;
-		msgn%=4;
+		msgn%=6;
 	}
 
 	switch(msgn){
@@ -402,6 +436,14 @@ void Motor_Send_Messages_CAN(){
 			break;
 	case 3:
 		Motor_Send_Status_CAN(&motor_state2);
+			break;
+
+	case 4:
+		Motor_Send_Diag_CAN(&motor_state1);
+			break;
+
+	case 5:
+		Motor_Send_Diag_CAN(&motor_state2);
 			break;
 	}
 }

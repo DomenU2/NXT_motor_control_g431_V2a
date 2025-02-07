@@ -36,6 +36,10 @@ BS_:
 BU_:
 
 
+BO_ 1044 m_diag_1: 8 Vector__XXX
+ SG_ reg_out : 7|32@0- (0.001,0) [0|0] "" Vector__XXX
+ SG_ er : 39|32@0- (0.001,0) [0|0] "" Vector__XXX
+
 BO_ 1043 m_command_1: 8 Vector__XXX
  SG_ m_mode : 5|4@0+ (1,0) [0|0] "" Vector__XXX
  SG_ m_en : 1|1@1+ (1,0) [0|0] "" Vector__XXX
@@ -54,7 +58,7 @@ BO_ 1041 m_ref_1: 8 Vector__XXX
 BO_ 1040 m_pos_vel_1: 8 Vector__XXX
  SG_ velocity : 39|32@0- (0.001,0) [0|0] "" Vector__XXX
  SG_ position : 7|32@0- (0.001,0) [0|0] "" Vector__XXX
- 
+
 BO_ 1059 m_command_2: 8 Vector__XXX
  SG_ m_mode : 5|4@0+ (1,0) [0|0] "" Vector__XXX
  SG_ m_en : 1|1@1+ (1,0) [0|0] "" Vector__XXX
@@ -73,6 +77,11 @@ BO_ 1057 m_ref_2: 8 Vector__XXX
 BO_ 1056 m_pos_vel_2: 8 Vector__XXX
  SG_ velocity : 39|32@0- (0.001,0) [0|0] "" Vector__XXX
  SG_ position : 7|32@0- (0.001,0) [0|0] "" Vector__XXX
+ 
+ 
+ BO_ 1060 m_diag_2: 8 Vector__XXX
+ SG_ reg_out : 7|32@0- (0.001,0) [0|0] "" Vector__XXX
+ SG_ er : 39|32@0- (0.001,0) [0|0] "" Vector__XXX
 
 
 
