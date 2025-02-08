@@ -69,58 +69,58 @@ void InitMotorControl(Motor_state_t *ms1,Motor_state_t *ms2){
     ms1->PWM_period = p_pwmT1->Init.Period;
 
     //PID position
-    ms1->reg_pos.limMin = -3*PI;
-    ms1->reg_pos.limMax = 3*PI;
+    ms1->reg_pos.limMin = -30*PI;
+    ms1->reg_pos.limMax = 30*PI;
     ms1->reg_pos.error_max = ms1->reg_pos.limMax - ms1->reg_pos.limMin;
     ms1->reg_pos.Kpp=600;
     ms1->reg_pos.Tip=1;
     ms1->reg_pos.Tdp=80;
 
     //PID speed
-     ms1->reg_speed.limMin = -500*PI;
-     ms1->reg_speed.limMax = 500*PI;
+     ms1->reg_speed.limMin = -30;
+     ms1->reg_speed.limMax = 30;
      ms1->reg_speed.error_max = ms1->reg_speed.limMax - ms1->reg_speed.limMin;
-     ms1->reg_speed.Kpp=1;
-     ms1->reg_speed.Tip=1e6;
+     ms1->reg_speed.Kpp=150;
+     ms1->reg_speed.Tip=2;
      ms1->reg_speed.Tdp=1;
 
 
 // MOTOR 2
 
-     ms2->motorID = MOTOR_ID_1;
-     ms2->pos_sign=-1;
-     ms2->pwm_sign=1;
-     ms2->p_encoderTimer = p_encT1;
-     ms2->p_pwmTimer = p_pwmT1;
+     ms2->motorID = MOTOR_ID_2;
+     ms2->pos_sign=1;
+     ms2->pwm_sign=-1;
+     ms2->p_encoderTimer = p_encT2;
+     ms2->p_pwmTimer = p_pwmT2;
      ///PWM variables
-     ms2->PWM_period = p_pwmT1->Init.Period;
+     ms2->PWM_period = p_pwmT2->Init.Period;
 
      //PID position
-     ms2->reg_pos.limMin = -3*PI;
-     ms2->reg_pos.limMax = 3*PI;
+     ms2->reg_pos.limMin = -30*PI;
+     ms2->reg_pos.limMax = 30*PI;
      ms2->reg_pos.error_max = ms2->reg_pos.limMax - ms2->reg_pos.limMin;
      ms2->reg_pos.Kpp=600;
      ms2->reg_pos.Tip=1;
      ms2->reg_pos.Tdp=80;
 
      //PID speed
-      ms2->reg_speed.limMin = -500*PI;
-      ms2->reg_speed.limMax = 500*PI;
+      ms2->reg_speed.limMin = -30;
+      ms2->reg_speed.limMax = 30;
       ms2->reg_speed.error_max = ms2->reg_speed.limMax - ms2->reg_speed.limMin;
-      ms2->reg_speed.Kpp=1;
-      ms2->reg_speed.Tip=1e6;
+      ms2->reg_speed.Kpp=150;
+      ms2->reg_speed.Tip=2;
       ms2->reg_speed.Tdp=1;
 }
 
 
 uint8_t Motor_Driver_Enable(Motor_state_t *ms1,Motor_state_t *ms2){
 
-	if(ms1->driver_enable==1 || ms1->driver_enable==1){
+	if(ms1->driver_enable==1 || ms2->driver_enable==1){
 		motorDriverEnable=1;
 		HAL_GPIO_WritePin(MOT_SLEEP_GPIO_Port, MOT_SLEEP_Pin, GPIO_PIN_SET);
 		//Pull sleep pin on DRV8833 HIGH
 	}
-	else{
+	if(ms1->driver_enable==0 && ms2->driver_enable==0){
 	   motorDriverEnable=0;
 	   HAL_GPIO_WritePin(MOT_SLEEP_GPIO_Port, MOT_SLEEP_Pin, GPIO_PIN_RESET);
 	   //Pull sleep pin on DRV8833 HIGH
@@ -167,6 +167,16 @@ if(ms->enable==1){
 else{
 		Set_Duty_Cycle(ms, 0, 0);
 	}
+}
+
+void Motor_Stop(Motor_state_t *ms){
+	ms->duty_cycle = ms->PWM_period;
+	Set_Duty_Cycle(ms, ms->PWM_period, ms->PWM_period);
+}
+
+void Motor_Coast(Motor_state_t *ms){
+	ms->duty_cycle = 0;
+	Set_Duty_Cycle(ms, 0, 0);
 }
 
 
@@ -347,10 +357,13 @@ void speed_ramp_test(Motor_state_t *ms){
 PWM_Control_Motor(ms, speed_ramp);
 }
 // en korak nadzorne zanke
+
+
 void MotorControl(Motor_state_t *ms){
 	UpdateEncoder(ms);
 	switch (ms->mode){
-	case STOP_MODE:
+	case COAST_MODE:
+		 Motor_Coast(ms);
 	break;
 	case POSITION_MODE:
 		PD_position(ms);
@@ -358,7 +371,11 @@ void MotorControl(Motor_state_t *ms){
 	case VELOCITY_MODE:
 		PI_speed(ms);
 	break;
-	case COAST_MODE:
+	case STOP_MODE:
+ 		Motor_Stop(ms);
+	break;
+	default:
+		Motor_Coast(ms);
 	break;
 	}
 
@@ -481,37 +498,33 @@ uint8_t Motor_Send_Diag_CAN(Motor_state_t *ms){
 
 void Motor_Send_Messages_CAN(){
 	//Send CAN statuses
-	static uint32_t time_cnt=0;
-	static uint8_t msgn=0;
-	if(time_cnt % MCAN_MSG_PERIOD == 0){
+	static uint8_t time_cnt=0;
+	time_cnt++;
+	time_cnt%=6;
+switch(time_cnt){
+case 0:
+	Motor_Send_Pos_Vel_CAN(&motor_state1);
+	Motor_Send_Pos_Vel_CAN(&motor_state2);
+break;
 
-		time_cnt=0;
-		msgn++;
-		msgn%=6;
-	}
+case 2:
+	Motor_Send_Status_CAN(&motor_state1);
+	Motor_Send_Status_CAN(&motor_state2);
+break;
 
-	switch(msgn){
-	case 0:
-		Motor_Send_Pos_Vel_CAN(&motor_state1);
-		break;
-	case 1:
-		Motor_Send_Pos_Vel_CAN(&motor_state2);
-			break;
-	case 2:
-		Motor_Send_Status_CAN(&motor_state1);
-			break;
-	case 3:
-		Motor_Send_Status_CAN(&motor_state2);
-			break;
+case 4:
+	Motor_Send_Diag_CAN(&motor_state1);
+	Motor_Send_Diag_CAN(&motor_state2);
+break;
 
-	case 4:
-		Motor_Send_Diag_CAN(&motor_state1);
-			break;
+}
 
-	case 5:
-		Motor_Send_Diag_CAN(&motor_state2);
-			break;
-	}
+
+
+
+
+
+
 }
 
 

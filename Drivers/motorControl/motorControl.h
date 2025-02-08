@@ -25,10 +25,10 @@
 
 //Types
 typedef enum{
-	STOP_MODE=0,
+	COAST_MODE=0,
 	POSITION_MODE=1,
 	VELOCITY_MODE=2,
-	COAST_MODE=3
+	STOP_MODE=3
 }MotorMode_e;
 
 typedef struct{
